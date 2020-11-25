@@ -3,10 +3,10 @@ Tools to build the KinKal package and install it in UPS.
 
 Instructions:
 
-cd working_dir
-git clone git@github.com:kutschke/KinKal_to_UPS.git
-setup mu2e
-KinKal_to_UPS/build -h
+* cd clean_working_dir
+* git clone git@github.com:kutschke/KinKal_to_UPS.git
+* setup mu2e
+* KinKal_to_UPS/build -h
 
 For example:
 KinKal_to_UPS/build -v "v0.1.1" -b -t -i -c "v3_18_2" -r "v6_20_08a -q+e20:+p383b:+prof" -j 24   -d ${PWD}/artexternals
@@ -17,6 +17,16 @@ KinKal_to_UPS/build -v "v0.1.1" -b -t -i -c "v3_18_2" -r "v6_20_08a -q+e20:+p383
 * The make step will do a 24 way parallel build, which is appropriate for mu2ebuild01
 * It will build both prof and debug; it knows that cmake spells these Release and Debug.
 * It assumes that debug version of ROOT differs from the prof version by the exchange prof->debug in the qualifier string
+
+When this is complete you will see the following subdirectories of clean_working_dir
+* KinKal_to_UPS - this package
+* KinKal        - the cloned source
+* build_prof    - the working space for the Release (prof) build
+* build_debug   - the working space for the Debug (debug) build
+* artexternals  - the UPS repo into which the code is installed.
+
+You can point the UPS repo at an arbitrary directory using the -D option but the other three directory names are fixed.
+
 
 
 
