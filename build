@@ -1,6 +1,6 @@
 #! /bin/bash
 #
-# 
+# Master script to build and install KinKal.
 #
 #
 
@@ -22,9 +22,13 @@ usage: build <options>
     -t run the tests
     -v GITVERSION ( name of the git tag )
     -V make this script verbose
+    -x EXTRAQUALS the ups product qualifiers added
     -d PRODUCTDIR
     -h print this help
 
+The resulting ups product will have qualifiers that are those of the
+underlying ROOT product plus any additional qualifiers specfied by the
+-x option.
 "
 }
 
@@ -91,84 +95,13 @@ install() {
    Begin install.
 
 "
+  export DEBUG_LEVEL=prof
+  export PACKAGE_VERSION=v00_01_01
+  export COMPILER_CODE=e20
+  export EXTRA_ROOT_QUALIFIERS=":p383b"
+  setup -B root ${ROOTBASEVER}
 
-  # Translate git version style to UPS version style.
-  local UPSVERSION=`echo $GITVERSION | sed 's/v//'  |sed 's/\./ /g' |awk '{printf ("v%2.2d_%2.2d_%2.2d", $1, $2, $3)}'`
-
-  # Form the UPS Flavor-qualifer managled directory names; match the ones from root.
-  setup -B root $ROOTBASEVER
-  local FQP=`echo $SETUP_ROOT | awk '{print $4"-"$8}' | sed 's/:/-/g'`
-  local FQD=`echo $FQP | sed 's/prof/debug/'`
-  unsetup root
-
-  # Create directories
-  local DD=$PRODUCTDIR/$PRODUCT/$UPSVERSION
-  local DU=$DD/ups
-  local DV=$PRODUCTDIR/$PRODUCT/${UPSVERSION}.version
-
-  echo "Will install in $DD"
-
-  echo $DV
-  echo $DU
-  echo $FQP
-  echo $FQD
-
-  # Make the ups directory structure
-  if  ! mkdir -p $DD  ; then
-    echo "ERROR - failed to make release dir $DD"
-    return 1
-  fi
-  mkdir -p $DV
-  mkdir -p $DU
-  mkdir -p $DD/$FQP
-  mkdir -p $DD/$FQD
-  mkdir -p $DD/source
-  mkdir -p $DD/include
-  mkdir -p $DD/ups
-
-  local RC1
-  local RC1
-
-  # Install header files
-  find KinKal -name \*.hh -exec cp --parents {} $DD/include/ \;
-  RC1=$?
-  find KinKal -name \*.h  -exec cp --parents {} $DD/include/ \;
-  RC2=$?
-  if [[ "$RC1" != "0" || "$RC2" != "0" ]]  ; then
-    echo "ERROR - failed to install header files."
-    return 2
-  fi
-
-  # Install binaries
-  tar cf - -C build_prof  bin lib | tar xf - -C $DD/$FQP
-  RC1=$?
-  tar cf - -C build_debug bin lib | tar xf - -C $DD/$FQD
-  RC2=$?
-  if [[ "$RC1" != "0" || "$RC2" != "0" ]]  ; then
-    echo "ERROR - failed to install binaries."
-    return 3
-  fi
-
-  # Install source, exclude only the git repo.
-  tar cf - KinKal --exclude-vcs | tar xf - -C $DD/source
-  RC1=$?
-  if [[ "$RC1" != "0" ]]  ; then
-    echo "ERROR - failed to install source."
-    return 3
-  fi
-
-  # install UPS files
-#  cat $SOURCEDIR/prd/NULL \
-#     | sed 's/REPLACE_UPSVERSION/'$UPSVERSION'/'    \
-#     > $DV/NULL
-
-#  cat $SOURCEDIR/prd/codetools.table \
-#     | sed 's/REPLACE_UPSVERSION/'$UPSVERSION'/'    \
-#     > $DD/ups/codetools.table
-#
-
-  # install scripts
-#  local RC
+  ${KINKAL_TO_UPS_DIR}/install
 
   return 0
 }
@@ -190,10 +123,11 @@ NBUILDTHREADS="1"
 PRODUCTDIR="$PWD"
 ROOTBASEVER=""
 DOTEST=""
+VERBOSE="false"
 GITVERSION="foo"
+EXTRAQUALS=""
 
-
-while getopts bCc:d:ij:r:tv:h OPT; do
+while getopts bCc:d:ij:r:tv:Vxh OPT; do
     case $OPT in
         b)
             export DOBUILD=true
@@ -217,7 +151,13 @@ while getopts bCc:d:ij:r:tv:h OPT; do
             ;;
         v)
             export GITVERSION=$OPTARG
-            echo "Have gitversion: " $GITVERSION
+            ;;
+        V)
+            export VERBOSE=true
+            ;;
+        x)
+            export EXTRAQUALS=$OPTARG
+            exit 0
             ;;
         h)
             usage
