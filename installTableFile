@@ -66,6 +66,8 @@ Common:
   Action = setup
     prodDir()
     setupEnv()
+    setupRequired(cetpkgsupport)
+
     envSet (KINKAL_INC, \${KINKAL_DIR}/include )
     pathPrepend(ROOT_INCLUDE_PATH, \${KINKAL_DIR}/include)
 
