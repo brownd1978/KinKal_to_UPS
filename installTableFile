@@ -1,6 +1,7 @@
 #! /bin/bash
 #
 # Create the table file in the products directory
+# This create entries for both the prof and debug versions.
 #
 # Arguments:
 #  1 - path to the table file.
@@ -8,32 +9,60 @@
 # This script overwrites previously existing installs of the table file.
 #
 
+# Define separate qualifier strings for both the prof and debug builds.
+# The base of the qualifier strings is the qualifier string for root.
+# Define 3 variants:
+#    - colon separated fields
+#    - colon separated fields with leading plus signs
+#    - dot separated fields
+setQualifiers(){
+
+  # Key on the root qualfiers.
+  echo ${rootQuals} | grep -q prof
+  if [[ "$?" == "0" ]]; then
+     profRootQuals=${rootQuals}
+     debugRootQuals=`echo ${rootQuals} | sed 's/prof/debug/' | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
+     profColonQuals=${qualifiers_colons}
+     debugColonQuals=`echo ${profColonQuals} | sed 's/prof/debug/' | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
+  else
+    echo ${rootQuals} | grep -q debug
+    if [[ "$?" == "0" ]]; then
+      debugRootQuals=${rootQuals}
+      profRootQuals=`echo ${rootQuals} | sed 's/debug/prof/' | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
+      debugColonQuals=${qualifiers_colons}
+      profColonQuals=`echo ${debugColonQuals} | sed 's/debug/prof/' | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
+    else
+      # Expect one of prof or debug
+      echo "Expected root to have either a prof or a debug qualifier"
+      return 1
+    fi
+  fi
+
+  # Qualifier string with plus signs, needed for the required setup.
+  plusProfRootQuals=`echo "+"${profRootQuals} | sed 's/:/:+/g'`
+  plusDebugRootQuals=`echo "+"${debugRootQuals} | sed 's/:/:+/g'`
+
+  # Qualifier strings with colons replaced by dots, needed for the _FQ environment variable
+  # and other environment variables that include it.
+  debugDotQuals=`echo ${debugColonQuals} | sed 's/:/./g'`
+  profDotQuals=`echo ${profColonQuals} | sed 's/:/./g'`
+
+  return 0
+}
+
+#--- main ---
+
 # Arguments
 destination_file=$1
 
-# Discover the versions of the products on which BTrk depends
+# Define they myriad variants of the qualifiers.
+setQualifiers
+if [[ "$?" != "0" ]]; then
+  exit 1
+fi
+
+# Discover the version of root on which KinKal depends
 root_ver=`ups active | awk '$1 == "root" {print $2}'`
-
-# A table file needs the qualifiers string in three formats:
-#   - colon delimited
-#   - dot deliminted
-#   - colon delimited with plus signs.
-# Define them all here and use them in the right spots in the table file.
-
-# qual1:qual2:qual3
-# No leading colon on the first qualifer
-colon_qualifiers=${COMPILER_CODE}
-
-# qual1.qual2.qual3
-# No leading dot on the first qualifer
-dot_qualifiers=${COMPILER_CODE}
-dot_extras=`echo ${EXTRA_ROOT_QUALIFIERS} | sed 's/:/./g'`
-
-# +qual1:+qual2:+qual3
-# No leading + or colon on the first qualifer
-plus_qualifiers=${COMPILER_CODE}
-plus_extras=`echo ${EXTRA_ROOT_QUALIFIERS} | sed 's/:/:+/g'`
-
 
 # Write the table file in place
 cat > ${destination_file} <<EOF
@@ -45,22 +74,22 @@ Product = ${PACKAGE_NAME}
 Group:
 
 Flavor     = ANY
-Qualifiers = "${colon_qualifiers}:debug${EXTRA_ROOT_QUALIFIERS}"
+Qualifiers = "${debugColonQuals}"
 
   Action = GetFQDir
       envSet( \${UPS_PROD_NAME_UC}_FS, "" )
       execute( "get-directory-name subdir", NO_UPS_ENV, \${UPS_PROD_NAME_UC}_FS )
-      envSet (KINKAL_FQ, \${\${UPS_PROD_NAME_UC}_FS}.${dot_qualifiers}.debug${dot_extras})
-      setupRequired( root  ${root_ver} -q +${plus_qualifiers}:+debug${plus_extras})
+      envSet (KINKAL_FQ, \${\${UPS_PROD_NAME_UC}_FS}.${debugDotQuals})
+      setupRequired( root  ${root_ver} -q ${plusDebugRootQuals})
 
 Flavor     = ANY
-Qualifiers = "${colon_qualifiers}:prof${EXTRA_ROOT_QUALIFIERS}"
+Qualifiers = "${profColonQuals}"
 
   Action = GetFQDir
       envSet( \${UPS_PROD_NAME_UC}_FS, "" )
       execute( "get-directory-name subdir", NO_UPS_ENV, \${UPS_PROD_NAME_UC}_FS )
-      envSet (KINKAL_FQ, \${\${UPS_PROD_NAME_UC}_FS}.${dot_qualifiers}.prof${dot_extras})
-      setupRequired( root  ${root_ver} -q +${plus_qualifiers}:+prof${plus_extras} )
+      envSet (KINKAL_FQ, \${\${UPS_PROD_NAME_UC}_FS}.${profDotQuals})
+      setupRequired( root  ${root_ver} -q ${plusProfRootQuals})
 
 Common:
   Action = setup
@@ -85,7 +114,3 @@ End:
 # End Group definition
 #*************************************************
 EOF
-
-unset root_ver
-unset plus_extras
-unset dot_extras

@@ -1,17 +1,84 @@
 #! /bin/bash
 #
-# Copy the files from the source and build areas to create a UPS product.
+# Copy files from the source and build areas to create a UPS product.
 #
 # This script unconditionally deletes previously existing installs of the
 # same product+version+qualifiers: use with care.
 #
+# The UPS qualifiers of the new product will be those of the version of
+# root on which it depends plus zero or more user specified additions.
+# The additions are provided as colon separated string.
+#
 
-PACKAGE_NAME=KinKal
+#
+# Convert the git tag into UPS version number style
+#    Examples: v0.1.1   to v00_01_01
+#              v0.100.1 to v00_100_01
+# Note: awk printf will expand field width to support numbers larger than 99.
+# Fixme: add more error checking and support other style tags, for example
+#        a suffix after the version number?
+setUPSVersion() {
+  nn=`echo $GITVERSION | awk 'BEGIN{FS="."} { print NF }'`
+  if [ "${nn}" != "3" ]; then
+     echo "Git version is not in a supported style: " ${GITVERSION}
+     return 1
+  fi
+  UPS_STYLE_VERSION=`echo $GITVERSION | sed 's/v//' | awk 'BEGIN{FS="."} { printf ( "v%02d_%02d_%02d\n", $1, $2, $3) }'`
+  return 0
+}
 
-# Check that the target UPS repo has been defined; if not provide a default.
-if [ "${PRODUCTS_INSTALL}" = '' ];then
-   PRODUCTS_INSTALL=${PWD}/artexternals
+# Extract the qualifiers for the version of root used to build this product.
+getRootQualifiers(){
+  export rootQuals=`echo $SETUP_ROOT | awk '{print $NF}'`
+  if [[ "$rootQuals" == "" ]]; then
+     echo "There are no root qualifiers ... "
+     return 1
+  fi
+  return 0
+}
+
+# Create the UPS qualifiers for the prof and debug versions
+#  - 3 versionS, needed for different places in UPSology
+#       - colon separated
+#       - dot separated
+#       - underscore separated
+setQualifiers(){
+  # Sort qualifiers by alphabetical order; xargs is used to strip trailing whitespace
+  export qualifiers_colons=`echo $rootQuals | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
+  export qualifiers_dots=`echo $qualifiers_colons | sed 's/:/./g'`
+  export qualifiers_underscores=`echo $qualifiers_colons | sed 's/:/_/g'`
+  return 0
+}
+
+#--- main ---
+
+setUPSVersion
+if [[ "$?" != 0 ]]; then
+    echo "Could not convert the git tag to a UPS version number. The git tag was: " ${GITVERSION}
+    exit 1
 fi
+echo "GITVER: " $UPS_STYLE_VERSION  $GITVERSION
+
+getRootQualifiers
+if [[ "$?" != 0 ]]; then
+    echo "getRootQualifiers failed: "
+    exit 1
+fi
+echo "Rootquals: " $rootQuals
+
+setQualifiers
+if [[ "$?" != 0 ]]; then
+    echo "setQualifiers failed: "
+    exit 1
+fi
+echo "prof:  " ${profQuals}
+echo "debug: " ${debugQuals}
+
+echo "quals(:)  " ${qualifiers_colons}
+echo "quals(.)  " ${qualifiers_dots}
+echo "quals(_)  " ${qualifiers_underscores}
+
+export PACKAGE_NAME=KinKal
 
 # Where to find the files in the installer package
 KINKAL_TO_UPS_DIR=`dirname $(readlink -f $0)`
@@ -31,26 +98,24 @@ if [ "${PACKAGE_SOURCE}" = '' ];then
 fi
 
 # There are two representations of operating system UPS flavor:
-# old style, for example: Linux64bit+2.6-2.12_e7
-# new style, for example: slf6.x86_64
+#   old style, for example: Linux64bit+2.6-2.12_e7
+#   new style, for example: slf6.x86_64
 # We need them both.
 old_flavour=`ups flavor -4`
 new_flavour=`get-directory-name subdir`
 
 # Build the names of the directories into which we will write things
-tmp_with_dots=`echo ${EXTRA_ROOT_QUALIFIERS} | sed 's/:/./g'`
-fq=${new_flavour}.${COMPILER_CODE}.${DEBUG_LEVEL}${tmp_with_dots}
+fq=${new_flavour}.${qualifiers_dots}
 topdir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}
-proddir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}/${PACKAGE_VERSION}
-verdir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}/${PACKAGE_VERSION}.version
-bindir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}/${PACKAGE_VERSION}/${fq}
-incdir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}/${PACKAGE_VERSION}/include
-upsdir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}/${PACKAGE_VERSION}/ups
+proddir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}/${UPS_STYLE_VERSION}
+verdir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}/${UPS_STYLE_VERSION}.version
+bindir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}/${UPS_STYLE_VERSION}/${fq}
+incdir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}/${UPS_STYLE_VERSION}/include
+upsdir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}/${UPS_STYLE_VERSION}/ups
 
 # I am not sure what this file is properly called.
 # I am calling it the fqfile, which is short for flavor qualifier file.
-tmp_with_underscore=`echo ${EXTRA_ROOT_QUALIFIERS} | sed 's/:/_/g'`
-fqfile=${verdir}/${old_flavour}_${COMPILER_CODE}_${DEBUG_LEVEL}${tmp_with_underscore}
+fqfile=${verdir}/${old_flavour}_${qualifiers_underscores}
 
 # Make directories, if needed.
 if ! [ -e ${topdir} ];then
@@ -107,17 +172,17 @@ rsync -ar --exclude-from  ${KINKAL_TO_UPS_DIR}/exclude_for_source.txt \
 cat > ${fqfile} <<EOF
 FILE = version
 PRODUCT = ${PACKAGE_NAME}
-VERSION = ${PACKAGE_VERSION}
+VERSION = ${UPS_STYLE_VERSION}
 
 #*************************************************
 #
 FLAVOR = ${old_flavour}
-QUALIFIERS = "${COMPILER_CODE}:${DEBUG_LEVEL}${EXTRA_ROOT_QUALIFIERS}"
+QUALIFIERS = "${qualifiers_colons}"
   DECLARER = `whoami`
   DECLARED = `date +"%Y-%m-%d %H:%M:%S GMT" -u`
   MODIFIER = `whoami`
   MODIFIED = `date +"%Y-%m-%d %H:%M:%S GMT" -u`
-  PROD_DIR = ${PACKAGE_NAME}/${PACKAGE_VERSION}
+  PROD_DIR = ${PACKAGE_NAME}/${UPS_STYLE_VERSION}
   UPS_DIR = ups
   TABLE_FILE = ${PACKAGE_NAME}.table
 
@@ -133,5 +198,3 @@ unset bindir
 unset incdir
 unset upsdir
 unset fqfile
-unset tmp_with_dots
-unset tmp_with_underscore

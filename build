@@ -2,33 +2,42 @@
 #
 # Master script to build and install KinKal.
 #
-#
-
 
 usage() {
 echo "
 
-Build, install and clean the KinKal ups product.
-The source directory and build directories will be created in the cwd.
+Build, test, install and cleanup the KinKal UPS product.
+The source directory and build directories will be created in the current working directory.
 
 usage: build <options>
 
-    -b build code
-    -C clean up working directories
-    -c VALUE cmake version and qualifiers
-    -i install as a product in $PRODUCTDIR/KinKal/$UPSVERSION
-    -j VALUE maximum number of build threads
-    -r VALUE root version and qualifiers
-    -t run the tests
-    -v GITVERSION ( name of the git tag )
-    -V make this script verbose
-    -x EXTRAQUALS the ups product qualifiers added
-    -d PRODUCTDIR
-    -h print this help
+Option Value      Description
+    -b            build code (optional, default = no )
+    -C            clean up working directories ( optional, default=no)
+    -c            VALUE cmake version and qualifiers (required if -b is selected )
+    -d PRODUCTS_INSTALL path to the root of the target UPS directory (required if -i selected)
+    -i            install as a UPS product ( optional, default=no)
+    -j VALUE      maximum number of build threads (optional, default =1)
+    -n            do a new clone; if absent expect on to be present (optional, default=no)
+    -r VALUE      root version and qualifiers (optional, if not specfied it will use UPS active)
+    -t            run the tests (optional, default=no, only works if -b is also specified )
+    -v GITVERSION name of the git tag (required)
+    -V            make this script verbose (optional, default = no )
+    -x EXTRAQUALS additional qualifiers to include in the name of the UPS product ( optional, default = "" )
+    -h            print this help
 
-The resulting ups product will have qualifiers that are those of the
-underlying ROOT product plus any additional qualifiers specfied by the
--x option.
+If the -i option is selected, the installed product will be installed in
+  ${PRODUCTS_INSTALL}/KinKal/${UPSVERSION}
+where UPSVERSION is determined automatically by the value of the -v option.
+For example, git version v0.1.1 becomes UPS version v00_01_01.
+
+The resulting UPS product will have qualifiers that are those of the underlying ROOT product
+plus any additional qualifiers specfied by the -x option.
+
+Notes:
+1) If the -n option is selected and there is already a directory named KinKal, the script will exit
+2) If the -b option is supplied it will overwrite any existing builds
+3) If the -i option is supplied it will overwrite any existing installs
 "
 }
 
@@ -39,7 +48,13 @@ checkConfiguration(){
   fi
 
   if [[ -n "$DOINSTALL" && -z "$GITVERSION" ]]; then
-    echo "You must supply a version when requesting an install."
+    echo "ERROR - you must supply a version when requesting an install."
+    return 2
+  fi
+
+  if [[ -n "$DOBUILD" && -z "$CMAKEVER" ]]; then
+    echo "ERROR - you must supply a cmake version when requesting a build."
+    return 3
   fi
 
   return 0
@@ -48,37 +63,40 @@ checkConfiguration(){
 
 # Fetch the code to be built.  If no version is specified, build the head.
 getCode() {
-  echo "
-
-  Begin clone and checkout for KinKal tag $GITVERSION
-
-"
-  git clone git@github.com:KFTrack/KinKal.git
-  if [[ "$?" != "0" ]]; then
-     return 1
-  fi
-  cd KinKal
-  if [[ -n "$GITVERSION" ]]; then
-    git checkout -b ${GITVERSION}_build_branch ${GITVERSION}
+  if [[ -n "${DOCLONE}" ]]; then
+    echo " Begin clone and checkout for KinKal tag "$GITVERSION
+    git clone git@github.com:KFTrack/KinKal.git
     if [[ "$?" != "0" ]]; then
-       return 2
+     return 1
     fi
-  fi
+    cd KinKal
+    if [[ -n "$GITVERSION" ]]; then
+      git checkout -b ${GITVERSION}_build_branch ${GITVERSION}
+      if [[ "$?" != "0" ]]; then
+         return 2
+      fi
+    fi
+    cd ..
+  else
+    echo "Using existing clone of KinKal: "
+  fi # End test on DOCLONE defined
 
   # Report the commit to be  built
-  git log -n 1 --decorate=full | cat  # Need the pipe cat or it will pipe to less
-  git status
+  if [[ -d KinKal ]]; then
+    cd KinKal
+    git log -n 1 --decorate=full | cat  # Need the pipe cat or it will pipe to less
+    git status
+    cd ..
+  else
+    echo "Error - The directory KinKal does not exist. "
+    return 3
+  fi
 
-  cd ..
   return 0
 }
 
 clean(){
-  echo "
-
-  Begin clean up.
-
-"
+  echo " Begin clean up. "
   for dir in KinKal build_prof build_debug; do
     if [[ -d ${dir} ]]; then
       echo "Removing " ${dir}
@@ -90,44 +108,47 @@ clean(){
 
 install() {
 
-  echo "
+  echo " Begin install. "
 
-   Begin install.
+  if [[ -d build_prof ]]; then
+    setup -B root ${ROOTBASEVER}
 
-"
-  export DEBUG_LEVEL=prof
-  export PACKAGE_VERSION=v00_01_01
-  export COMPILER_CODE=e20
-  export EXTRA_ROOT_QUALIFIERS=":p383b"
-  setup -B root ${ROOTBASEVER}
+    ${KINKAL_TO_UPS_DIR}/install
+    unsetup root
+  fi
 
-  ${KINKAL_TO_UPS_DIR}/install
+  if [[ -d build_debug ]]; then
+    setup -B root v6_20_08a -q+e20:+p383b:+debug
+
+    ${KINKAL_TO_UPS_DIR}/install
+    unsetup root
+  fi
 
   return 0
 }
 
 # ********** main **********
 
-echo "Start ... "
-
 PRODUCT=KinKal
 KINKAL_TO_UPS_DIR=`dirname $(readlink -f $0)`
 SOURCEDIR=`readlink -f $KINKAL_TO_UPS_DIR/..`
 
-
+DOCLONE=""
 DOBUILD=""
 DOCLEAN=""
-CMAKEVER=""
 DOINSTALL=""
-NBUILDTHREADS="1"
-PRODUCTDIR="$PWD"
+PRODUCTS_INSTALL="${PWD}/artexternals"
 ROOTBASEVER=""
-DOTEST=""
-VERBOSE="false"
-GITVERSION="foo"
+VERBOSE=""
 EXTRAQUALS=""
 
-while getopts bCc:d:ij:r:tv:Vxh OPT; do
+# Used by one or more of the subscripts build_one_verion, install, or installTableFile
+export CMAKEVER=""
+export GITVERSION=""
+export DOTEST=""
+export NBUILDTHREADS="1"
+
+while getopts abCc:d:ij:nr:tv:Vxh OPT; do
     case $OPT in
         b)
             export DOBUILD=true
@@ -137,23 +158,24 @@ while getopts bCc:d:ij:r:tv:Vxh OPT; do
         c)  export CMAKEVER=$OPTARG
             ;;
         d)
-            export PRODUCTDIR=$OPTARG
+            export PRODUCTS_INSTALL=$OPTARG
             ;;
         i)
             export DOINSTALL=true
-            echo "Processed install argument ..."
             ;;
         j)  export NBUILDTHREADS=$OPTARG
             ;;
+        n)  export DOCLONE=true
+            ;;
         r)  export ROOTBASEVER=$OPTARG
             ;;
-        t)  export DOTEST=true
+        t)  export DOTEST="true"
             ;;
         v)
             export GITVERSION=$OPTARG
             ;;
         V)
-            export VERBOSE=true
+            export VERBOSE="true"
             ;;
         x)
             export EXTRAQUALS=$OPTARG
@@ -164,27 +186,28 @@ while getopts bCc:d:ij:r:tv:Vxh OPT; do
             exit 0
             ;;
         *)
-            echo unknown option, exiting
+            echo "Error - unknown option, exiting"
 	    usage
             exit 1
             ;;
      esac
 done
 
-echo "Mark 1"
-
-echo "PRODUCT:       " ${PRODUCT}
-echo "KINKAL_TO_UPS_DIR:       " ${KINKAL_TO_UPS_DIR}
-echo "SOURCEDIR:     " ${SOURCEDIR}
-echo "DOBUILD:       " ${DOBUILD}
-echo "DOCLEAN:       " ${DOCLEAN}
-echo "CMAKEVER:      " ${CMAKEVER}
-echo "DOINSTALL:     " ${DOINSTALL}
-echo "PRODUCTDIR:    " ${PRODUCTDIR}
-echo "ROOTBASEVER:   " ${ROOTBASEVER}
-echo "DOTEST:        " ${DOTEST}
-echo "GITVERSION:    " ${GITVERSION}
-echo "NBUILDTHREADS: " ${NBUILDTHREADS}
+if [[ -n "$VERBOSE" ]]; then
+  echo "PRODUCT:           " ${PRODUCT}
+  echo "KINKAL_TO_UPS_DIR: " ${KINKAL_TO_UPS_DIR}
+  echo "SOURCEDIR:         " ${SOURCEDIR}
+  echo "DOCLONE:           " ${DOCLONE}
+  echo "DOBUILD:           " ${DOBUILD}
+  echo "DOCLEAN:           " ${DOCLEAN}
+  echo "CMAKEVER:          " ${CMAKEVER}
+  echo "DOINSTALL:         " ${DOINSTALL}
+  echo "PRODUCTS_INSTALL:  " ${PRODUCTS_INSTALL}
+  echo "ROOTBASEVER:       " ${ROOTBASEVER}
+  echo "DOTEST:            " ${DOTEST}
+  echo "GITVERSION:        " ${GITVERSION}
+  echo "NBUILDTHREADS:     " ${NBUILDTHREADS}
+fi
 
 if ! checkConfiguration ; then
   usage
@@ -221,5 +244,5 @@ if [ -n "$DOCLEAN" ]; then
   fi
 fi
 
-echo "KinKal_build completed with status 0"
+echo "KinKal_to_UPS/build completed with status 0"
 exit 0
