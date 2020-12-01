@@ -1,15 +1,17 @@
 # KinKal_to_UPS
 Tools to build the KinKal package and install it in UPS.
 
-# Introduction
+## Introduction
 
-There are two basic ways to use this package:
+There are two extreme ways to use this package:
   1) If you already have an exisiting build, you can create a UPS repository and install the existing build there.
   2) Start with nothing, clone, checkout, and, for both build prof and debug, build, test and install.
 
+There are command line options to choose intermediate amounts of work.
+
 ## Instructions for case 1
 
-The simplest example for is that you have a working directory that contains 2 directories:
+The simplest example is that you have a working directory that contains 2 directories:
 
   KinKal build_debug
 
@@ -20,14 +22,14 @@ the following:
 * KinKal_to_UPS/build -h  # to see the help
 * KinKal_to_UPS/build -v <git_tag_name> -i
 
-This will look for the source for KinKal in the subdirectory KinKal and for the built debug version in
+This will look for the source in the subdirectory KinKal and for the built debug version in
 the subdirectory build_debug.  It will install the already built git tag and into the default UPS
 repository, which is ./artexternals; the UPS repository will be created if necessary.  The git tag
 is needed in order to name the UPS product version.
 
 For example, if git_tag_name is v0.1.1, the UPS installation will be located at:
 
-   artexternals/KinKal/v00_01_00
+   artexternals/KinKal/v00_01_01
 
 and the UPS qualifiers will be copied from the underlying root UPS pacakge.
 
@@ -37,7 +39,7 @@ To use this UPS product:
 * ups list -aK+ KinKal
 * setup -B KinKal VERSION -qQUALIFIERS
 
-You can access the headers and librarie with the usual -I$KINKAL_INC and -L$KINKAL_LIB.  The include line within a .cc file should look like:
+You can access the headers and libraries with the usual -I$KINKAL_INC and -L$KINKAL_LIB.  An include directive within a .cc file should look like:
 
   #include "KinKal/Fit/Track.hh"
 
@@ -48,17 +50,17 @@ Start in a clean working directory with no UPS version of root or cmake already 
 
 * git clone git@github.com:kutschke/KinKal_to_UPS.git
 * setup mu2e
-* KinKal_to_UPS/build -h  # to see the help
-* KinKal_to_UPS/build -v "v0.1.1" -b -t -i -c "v3_18_2" -r "v6_20_08a -q+e20:+p383b:+prof" -j 24   -d ${PWD}/artexternals
+* KinKal_to_UPS/build -v "v0.1.1" -n -b -t -i -c "v3_18_2" -r "v6_20_08a -q+e20:+p383b:+prof" -j 24   -d ${PWD}/artexternals
 
 This will do the following
-* For the requested git tag of KinKal this will build, run the tests and install KinKal into UPS.
+* For the requested git tag of KinKal this will clone, checkout, cmake, make, make tests, and install into UPS.
 * The ups repository into which it is installed is given by the -d option; the default is ${PWD}/artexternals.
 * It will use the indicated versions of cmake and root; there is a default for cmake but only sort-of for root (see below).
-* The make step will do a 24 way parallel build, which is appropriate for mu2ebuild01
+* The make step will do a 24 way parallel build, which is appropriate for mu2ebuild01; the default is a one thread build.
 * It will build both prof and debug; it knows that cmake spells these Release and Debug.
 * It assumes that debug version of ROOT differs from the prof version by the exchange prof->debug in the qualifier string
-* If you omit the -r qualifier, and if there is already a version of root set up in the environment, this command will only build and install one of prof/debug, the one matching the version of root already set up.
+* If you omit the -r qualifier, and if there is already a UPS version of root set up in the environment, this command will only build and install one of prof/debug, the one matching the version of root already set up.
+* If you omit the -r qualifier, and if there is no UPS version of root setup in the environment, it is an error.
 
 When this is complete you will see the following subdirectories of clean_working_dir
 * KinKal_to_UPS - this package
@@ -80,5 +82,7 @@ and artexternals/KinKal.
 * Add an option to add additional qualifiers to the KinKal product
 * Is it OK that the names build_prof, build_debug are hard coded?  If not, we can make options to define them.
 * Should I add an option to make tar files for installation on cvmfs?
+* What additional checks for corner cases are needed?
+* I need to roll up the return statuses to one overall exit status and update the exit message.
 * What else?
 
