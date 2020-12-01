@@ -6,53 +6,41 @@
 usage() {
 echo "
 
-Build, test, install and cleanup the KinKal UPS product.
-The source directory and build directories will be created in the current working directory.
+Script to build, test, install and cleanup the KinKal UPS product.
 
 usage: build <options>
 
 Option Value      Description
     -b            build code (optional, default = no )
     -C            clean up working directories ( optional, default=no)
-    -c            VALUE cmake version and qualifiers (required if -b is selected )
-    -d PRODUCTS_INSTALL path to the root of the target UPS directory (required if -i selected)
+    -c            VALUE cmake version and qualifiers ( optional, default="v3_18_2", used only for the build step)
+    -d upsRoot    path to the root of the target UPS directory (required if -i selected)
     -i            install as a UPS product ( optional, default=no)
-    -j VALUE      maximum number of build threads (optional, default =1)
+    -j value      maximum number of build threads (optional, default =1)
     -n            do a new clone; if absent expect on to be present (optional, default=no)
-    -r VALUE      root version and qualifiers (optional, if not specfied it will use UPS active)
+    -r value      root version and qualifiers (optional, if not specfied it will use UPS active)
     -t            run the tests (optional, default=no, only works if -b is also specified )
-    -v GITVERSION name of the git tag (required)
+    -v gitVersion name of the git tag (required)
     -V            make this script verbose (optional, default = no )
-    -x EXTRAQUALS additional qualifiers to include in the name of the UPS product ( optional, default = "" )
+    -x extraQuals additional qualifiers to include in the name of the UPS product ( optional, default = "" )
     -h            print this help
 
-If the -i option is selected, the installed product will be installed in
-  ${PRODUCTS_INSTALL}/KinKal/${UPSVERSION}
-where UPSVERSION is determined automatically by the value of the -v option.
-For example, git version v0.1.1 becomes UPS version v00_01_01.
-
-The resulting UPS product will have qualifiers that are those of the underlying ROOT product
-plus any additional qualifiers specfied by the -x option.
-
-Notes:
-1) If the -n option is selected and there is already a directory named KinKal, the script will exit
-2) If the -b option is supplied it will overwrite any existing builds
-3) If the -i option is supplied it will overwrite any existing installs
+For additional details see: https://github.com/kutschke/KinKal_to_UPS
 "
 }
 
 checkConfiguration(){
-  if [[ -z "$DOBUILD" && -z "$DOINSTALL" && -z "$DOCLEAN" ]]; then
+  if [[ -z "$doBuild" && -z "$doInstall" && -z "$doClean" ]]; then
     echo "ERROR - no actions requested"
     return 1
   fi
 
-  if [[ -n "$DOINSTALL" && -z "$GITVERSION" ]]; then
+  if [[ -n "$doInstall" && -z "$gitVersion" ]]; then
     echo "ERROR - you must supply a version when requesting an install."
     return 2
   fi
 
-  if [[ -n "$DOBUILD" && -z "$CMAKEVER" ]]; then
+  if [[ -n "$doBuild" && -z "$cmakever" ]]; then
     echo "ERROR - you must supply a cmake version when requesting a build."
     return 3
   fi
@@ -60,18 +48,67 @@ checkConfiguration(){
   return 0
 }
 
+# Gymnastics with root qualifiers to predefine several variants that will be needed.
+processROOTQualifiers(){
 
-# Fetch the code to be built.  If no version is specified, build the head.
+  # If a root version was not specified by command line argument, then see
+  # if there is a root already setup in the environment and use that.
+  if [[ -n "${rootCmdLineOption}" ]]; then
+     rootQuals=`echo ${rootCmdLineOption} | awk '{print $2}' | sed 's/-q//' | sed 's/+//g'`
+     root_version_local=`echo ${rootCmdLineOption} | awk '{print $1}' `
+  elif [[ -n ${SETUP_ROOT} ]]; then
+     rootQuals=`echo ${SETUP_ROOT} | awk '{print $NF}'`
+     root_version_local=${ROOT_VERSION}
+     rootCmdLineOption="$ROOT_VERSION -q$rootQuals"
+  else
+     # If we are only cleaning then we do not need root
+     if [[ -n "$doBuild" && -n "$doInstall" ]]; then
+       echo "Error - you must either supply the -r option or have an already setup version of ROOT in your shell."
+       return 1
+     fi
+  fi
+
+  # Define both the debug and prof versions of the qualifer strings.
+  echo ${rootQuals} | grep -q prof
+  if [[ "$?" == "0" ]]; then
+     profRootQuals=${rootQuals}
+     debugRootQuals=`echo ${rootQuals} | sed 's/prof/debug/' | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
+     profColonQuals=${qualifiers_colons}
+     debugColonQuals=`echo ${profColonQuals} | sed 's/prof/debug/' | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
+  else
+    echo ${rootQuals} | grep -q debug
+    if [[ "$?" == "0" ]]; then
+      debugRootQuals=${rootQuals}
+      profRootQuals=`echo ${rootQuals} | sed 's/debug/prof/' | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
+      debugColonQuals=${qualifiers_colons}
+      profColonQuals=`echo ${debugColonQuals} | sed 's/debug/prof/' | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
+    else
+      # Expect one of prof or debug; if we are only cleaning then we do not need root
+      if [[ -n "$doBuild" && -n "$doInstall" ]]; then
+        echo "Error - Expected root to have either a prof or a debug qualifier"
+        return 1
+      fi
+    fi
+  fi
+
+  # Qualifier string with plus signs, needed to setup root
+  plusProfRootQuals=`echo "+"${profRootQuals} | sed 's/:/:+/g'`
+  plusDebugRootQuals=`echo "+"${debugRootQuals} | sed 's/:/:+/g'`
+
+  return 0
+}
+
+# Fetch the code to be built.  If no version is specified, use the head of the default branch.
 getCode() {
-  if [[ -n "${DOCLONE}" ]]; then
-    echo " Begin clone and checkout for KinKal tag "$GITVERSION
+  if [[ -n "${doClone}" ]]; then
+    echo "Begin clone and checkout for KinKal tag "$gitVersion
     git clone git@github.com:KFTrack/KinKal.git
     if [[ "$?" != "0" ]]; then
      return 1
     fi
     cd KinKal
-    if [[ -n "$GITVERSION" ]]; then
-      git checkout -b ${GITVERSION}_build_branch ${GITVERSION}
+    if [[ -n "$gitVersion" ]]; then
+      git checkout -b ${gitVersion}_build_branch ${gitVersion}
       if [[ "$?" != "0" ]]; then
          return 2
       fi
@@ -79,12 +116,12 @@ getCode() {
     cd ..
   else
     echo "Using existing clone of KinKal: "
-  fi # End test on DOCLONE defined
+  fi # End test on doClone defined
 
   # Report the commit to be  built
   if [[ -d KinKal ]]; then
     cd KinKal
-    git log -n 1 --decorate=full | cat  # Need the pipe cat or it will pipe to less
+    git log -n 1 --decorate=full | cat  # Need the pipe cat or it may pipe to less
     git status
     cd ..
   else
@@ -96,7 +133,7 @@ getCode() {
 }
 
 clean(){
-  echo " Begin clean up. "
+  echo "Begin clean up. "
   for dir in KinKal build_prof build_debug; do
     if [[ -d ${dir} ]]; then
       echo "Removing " ${dir}
@@ -108,20 +145,14 @@ clean(){
 
 install() {
 
-  echo " Begin install. "
+  echo "Begin install. "
 
   if [[ -d build_prof ]]; then
-    setup -B root ${ROOTBASEVER}
-
-    ${KINKAL_TO_UPS_DIR}/install
-    unsetup root
+    ${thisDir}/install ${gitVersion} ${upsRoot} ${root_version_local} ${profRootQuals}
   fi
 
   if [[ -d build_debug ]]; then
-    setup -B root v6_20_08a -q+e20:+p383b:+debug
-
-    ${KINKAL_TO_UPS_DIR}/install
-    unsetup root
+    ${thisDir}/install ${gitVersion} ${upsRoot} ${root_version_local} ${debugRootQuals}
   fi
 
   return 0
@@ -129,57 +160,56 @@ install() {
 
 # ********** main **********
 
-PRODUCT=KinKal
-KINKAL_TO_UPS_DIR=`dirname $(readlink -f $0)`
-SOURCEDIR=`readlink -f $KINKAL_TO_UPS_DIR/..`
+productName=KinKal
 
-DOCLONE=""
-DOBUILD=""
-DOCLEAN=""
-DOINSTALL=""
-PRODUCTS_INSTALL="${PWD}/artexternals"
-ROOTBASEVER=""
-VERBOSE=""
-EXTRAQUALS=""
+# The directory that contains this script (and others that it will run).
+thisDir=`dirname $(readlink -f $0)`
 
-# Used by one or more of the subscripts build_one_verion, install, or installTableFile
-export CMAKEVER=""
-export GITVERSION=""
-export DOTEST=""
-export NBUILDTHREADS="1"
+# Default values for command line argument options
+cmakever="v3_18_2"
+doClone=""
+doBuild=""
+doClean=""
+doInstall=""
+doTest=""
+gitVersion=""
+nBuildThreads="1"
+upsRoot="${PWD}/artexternals"
+rootCmdLineOption=""
+verbose=""
+extraQuals=""
 
 while getopts abCc:d:ij:nr:tv:Vxh OPT; do
     case $OPT in
         b)
-            export DOBUILD=true
+            doBuild=true
             ;;
-        C)  export DOCLEAN=true
+        C)  doClean=true
             ;;
-        c)  export CMAKEVER=$OPTARG
+        c)  cmakever=$OPTARG
             ;;
         d)
-            export PRODUCTS_INSTALL=$OPTARG
+            upsRoot=$OPTARG
             ;;
         i)
-            export DOINSTALL=true
+            doInstall=true
             ;;
-        j)  export NBUILDTHREADS=$OPTARG
+        j)  nBuildThreads=$OPTARG
             ;;
-        n)  export DOCLONE=true
+        n)  doClone=true
             ;;
-        r)  export ROOTBASEVER=$OPTARG
+        r)  rootCmdLineOption=$OPTARG
             ;;
-        t)  export DOTEST="true"
+        t)  doTest="true"
             ;;
         v)
-            export GITVERSION=$OPTARG
+            gitVersion=$OPTARG
             ;;
         V)
-            export VERBOSE="true"
+            verbose="true"
             ;;
         x)
-            export EXTRAQUALS=$OPTARG
-            exit 0
+            extraQuals=$OPTARG
             ;;
         h)
             usage
@@ -193,20 +223,28 @@ while getopts abCc:d:ij:nr:tv:Vxh OPT; do
      esac
 done
 
-if [[ -n "$VERBOSE" ]]; then
-  echo "PRODUCT:           " ${PRODUCT}
-  echo "KINKAL_TO_UPS_DIR: " ${KINKAL_TO_UPS_DIR}
-  echo "SOURCEDIR:         " ${SOURCEDIR}
-  echo "DOCLONE:           " ${DOCLONE}
-  echo "DOBUILD:           " ${DOBUILD}
-  echo "DOCLEAN:           " ${DOCLEAN}
-  echo "CMAKEVER:          " ${CMAKEVER}
-  echo "DOINSTALL:         " ${DOINSTALL}
-  echo "PRODUCTS_INSTALL:  " ${PRODUCTS_INSTALL}
-  echo "ROOTBASEVER:       " ${ROOTBASEVER}
-  echo "DOTEST:            " ${DOTEST}
-  echo "GITVERSION:        " ${GITVERSION}
-  echo "NBUILDTHREADS:     " ${NBUILDTHREADS}
+# Control building one or both build types.
+doprof="true"
+dodebug="true"
+
+processROOTQualifiers
+if [[ "$?" != "0" ]]; then
+  exit 1
+fi
+
+if [[ -n "$verbose" ]]; then
+  echo "productName:       " ${productName}
+  echo "thisDir:           " ${thisDir}
+  echo "doClone:           " ${doClone}
+  echo "doBuild:           " ${doBuild}
+  echo "doClean:           " ${doClean}
+  echo "cmakever:          " ${cmakever}
+  echo "doInstall:         " ${doInstall}
+  echo "upsRoot:           " ${upsRoot}
+  echo "rootCmdLineOption: " ${rootCmdLineOption}
+  echo "doTest:            " ${doTest}
+  echo "gitVersion:        " ${gitVersion}
+  echo "nBuildThreads:     " ${nBuildThreads}
 fi
 
 if ! checkConfiguration ; then
@@ -214,31 +252,27 @@ if ! checkConfiguration ; then
   exit 2
 fi
 
-if [ -n "$DOBUILD" ]; then
+if [ -n "$doBuild" ]; then
   if ! getCode ; then
     exit 3
   fi
-  export ROOTVER=${ROOTBASEVER}
-  ${KINKAL_TO_UPS_DIR}/build_one_version
+  ${thisDir}/build_one_version ${cmakever} "${root_version_local} -q${plusProfRootQuals}" ${nBuildThreads} ${doTest}
   if [[ "$?" != "0" ]]; then
      exit 4
   fi
-  echo "Old rootver: " $ROOTVER
-  export ROOTVER=`echo ${ROOTBASEVER} | sed 's/prof/debug/'`
-  echo "New rootver: " $ROOTVER
-  ${KINKAL_TO_UPS_DIR}/build_one_version
+  ${thisDir}/build_one_version ${cmakever} "${root_version_local} -q${plusDebugRootQuals}" ${nBuildThreads} ${doTest}
   if [[ "$?" != "0" ]]; then
      exit 5
   fi
 fi
 
-if [ -n "$DOINSTALL" ]; then
+if [ -n "$doInstall" ]; then
   if ! install ; then
     exit 6
   fi
 fi
 
-if [ -n "$DOCLEAN" ]; then
+if [ -n "$doClean" ]; then
   if ! clean ; then
     exit 7
   fi

@@ -5,39 +5,40 @@
 # This is a separate script, not a bash function so that it will
 # run in a sub-shell and not modify the environment of its parent shell.
 #
-# Environment variables used:
-# CMAKEVER       = version + qualifer string for cmake
-# ROOTVER        = version + qualifier string for root
-# NBUILDTHREADS  = number of threads to use for make
-# DOTESTS        = if true then do the tests after the build
+# Arguments
+# cmakever             = version + qualifer string for cmake
+# root_for_this_build  = version + qualifier string for root
+# nbuildthreads        = number of threads to use for make
+# dotest               = if true then do the tests after the build
+
+cmake_ver=$1
+root_for_this_build=$2
+nbuildthreads=$3
+dotest=$4
 
 # cmake and ups spell build types differently; do the translation
 cmake_build_type=""
 ups_build_type=""
-if grep -q "prof"  <<< "$ROOTVER"; then
+if grep -q "prof"  <<< "$root_for_this_build"; then
   cmake_build_type="Release"
   ups_build_type="prof"
-elif grep -q "$debug"  <<< "$ROOTVER"; then
+elif grep -q "debug"  <<< "$root_for_this_build"; then
   cmake_build_type="Debug"
   ups_build_type="debug"
 else
   echo "Could not understand requested build type derived from the ups ROOT product"
-  echo "The ups root version is: " $ROOTVER
+  echo "The ups root version is: " $root_for_this_build
   exit 1
 fi
 
-echo "
-
-  Begin ${ups_build_type} build
-
-"
+echo " Begin ${ups_build_type} build "
 
 setup mu2e
-setup cmake ${CMAKEVER}
+setup cmake ${cmake_ver}
 if [[ "$?" != "0" ]]; then
   exit 2
 fi
-setup -B root ${ROOTVER}
+setup -B root ${root_for_this_build}
 if [[ "$?" != "0" ]]; then
   exit 3
 fi
@@ -50,13 +51,13 @@ if [[ "$?" != "0" ]]; then
   exit 4
 fi
 
-make -j ${NBUILDTHREADS}
+make -j ${nbuildthreads}
 if [[ "$?" != "0" ]]; then
   exit 5
 fi
 
-if [[ -n "${DOTEST}" ]]; then
-  make -j ${NBUILDTHREADS} test
+if [[ -n "${dotest}" ]]; then
+  make -j ${nbuildthreads} test
   if [[ "$?" != "0" ]]; then
     exit 6
   fi

@@ -1,7 +1,12 @@
 # KinKal_to_UPS
 Tools to build the KinKal package and install it in UPS.
 
-Instructions:
+There are two ways to use this package:
+  1) Start with nothing, clone, checkout, and, for both build prof and debug, build, test and install.
+  2) If you already have an exisiting build, you can install the existing build.
+
+
+Instructions for Case 1
 
 * cd clean_working_dir
 * git clone git@github.com:kutschke/KinKal_to_UPS.git
@@ -25,7 +30,9 @@ When this is complete you will see the following subdirectories of clean_working
 * build_debug   - the working space for the Debug (debug) build
 * artexternals  - the UPS repo into which the code is installed.
 
-You can point the UPS repo at an arbitrary directory using the -D option but the other three directory names are fixed.
+You can point the UPS repo at an arbitrary directory using the -D option but the other four directory names are hard coded.
+
+Instructions for case 2:
 
 
 

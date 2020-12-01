@@ -2,12 +2,19 @@
 #
 # Copy files from the source and build areas to create a UPS product.
 #
+# Arguments:
+#  1 - The version of root on which this depends
+#  2 - root of the UPS repo into which the product will be installed
+#  3 - The qualifier string for the root version
+#  4 - not yet implemented - will be additional qualifiers for KinKal
+#
 # This script unconditionally deletes previously existing installs of the
 # same product+version+qualifiers: use with care.
 #
 # The UPS qualifiers of the new product will be those of the version of
-# root on which it depends plus zero or more user specified additions.
-# The additions are provided as colon separated string.
+# root on which it depends.
+#
+# Fixme: add support for additional qualifiers
 #
 
 #
@@ -18,84 +25,64 @@
 # Fixme: add more error checking and support other style tags, for example
 #        a suffix after the version number?
 setUPSVersion() {
-  nn=`echo $GITVERSION | awk 'BEGIN{FS="."} { print NF }'`
+  nn=`echo $gitversion | awk 'BEGIN{FS="."} { print NF }'`
   if [ "${nn}" != "3" ]; then
-     echo "Git version is not in a supported style: " ${GITVERSION}
+     echo "Git version is not in a supported style: " ${gitversion}
      return 1
   fi
-  UPS_STYLE_VERSION=`echo $GITVERSION | sed 's/v//' | awk 'BEGIN{FS="."} { printf ( "v%02d_%02d_%02d\n", $1, $2, $3) }'`
+  UPS_STYLE_VERSION=`echo $gitversion | sed 's/v//' | awk 'BEGIN{FS="."} { printf ( "v%02d_%02d_%02d\n", $1, $2, $3) }'`
   return 0
 }
 
-# Extract the qualifiers for the version of root used to build this product.
-getRootQualifiers(){
-  export rootQuals=`echo $SETUP_ROOT | awk '{print $NF}'`
-  if [[ "$rootQuals" == "" ]]; then
-     echo "There are no root qualifiers ... "
-     return 1
-  fi
-  return 0
-}
 
 # Create the UPS qualifiers for the prof and debug versions
-#  - 3 versionS, needed for different places in UPSology
+#  - 3 versions, needed for different places in UPSology
 #       - colon separated
 #       - dot separated
 #       - underscore separated
 setQualifiers(){
   # Sort qualifiers by alphabetical order; xargs is used to strip trailing whitespace
-  export qualifiers_colons=`echo $rootQuals | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
-  export qualifiers_dots=`echo $qualifiers_colons | sed 's/:/./g'`
-  export qualifiers_underscores=`echo $qualifiers_colons | sed 's/:/_/g'`
+  qualifiers_colons=`echo $rootQuals | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
+  qualifiers_dots=`echo $qualifiers_colons | sed 's/:/./g'`
+  qualifiers_underscores=`echo $qualifiers_colons | sed 's/:/_/g'`
   return 0
 }
 
 #--- main ---
 
+gitversion=$1
+upsRoot=$2
+rootVer=$3
+rootQuals=$4
+
+package_name=KinKal
+package_source=${PWD}/${package_name}
+
 setUPSVersion
 if [[ "$?" != 0 ]]; then
-    echo "Could not convert the git tag to a UPS version number. The git tag was: " ${GITVERSION}
+    echo "ERROR - Could not convert the git tag to a UPS version number. The git tag was: " ${gitversion}
     exit 1
 fi
-echo "GITVER: " $UPS_STYLE_VERSION  $GITVERSION
-
-getRootQualifiers
-if [[ "$?" != 0 ]]; then
-    echo "getRootQualifiers failed: "
-    exit 1
-fi
-echo "Rootquals: " $rootQuals
 
 setQualifiers
 if [[ "$?" != 0 ]]; then
-    echo "setQualifiers failed: "
-    exit 1
+    echo "ERROR - setQualifiers failed: "
+    exit 2
 fi
-echo "prof:  " ${profQuals}
-echo "debug: " ${debugQuals}
-
-echo "quals(:)  " ${qualifiers_colons}
-echo "quals(.)  " ${qualifiers_dots}
-echo "quals(_)  " ${qualifiers_underscores}
-
-export PACKAGE_NAME=KinKal
 
 # Where to find the files in the installer package
 KINKAL_TO_UPS_DIR=`dirname $(readlink -f $0)`
 
 # Intialize UPS repo if needed.
-if ! [ -e ${PRODUCTS_INSTALL} ]; then
-  mkdir ${PRODUCTS_INSTALL}
-  cp -r ${KINKAL_TO_UPS_DIR}/.upsfiles ${PRODUCTS_INSTALL}
-  cp -r ${KINKAL_TO_UPS_DIR}/.updfiles ${PRODUCTS_INSTALL}
+if ! [ -e ${upsRoot} ]; then
+  mkdir ${upsRoot}
+  cp -r ${KINKAL_TO_UPS_DIR}/.upsfiles ${upsRoot}
+  cp -r ${KINKAL_TO_UPS_DIR}/.updfiles ${upsRoot}
 fi
 
 # Need this for get-directory-name
 setup cetpkgsupport
 
-if [ "${PACKAGE_SOURCE}" = '' ];then
-   PACKAGE_SOURCE=${PWD}/${PACKAGE_NAME}
-fi
 
 # There are two representations of operating system UPS flavor:
 #   old style, for example: Linux64bit+2.6-2.12_e7
@@ -106,12 +93,12 @@ new_flavour=`get-directory-name subdir`
 
 # Build the names of the directories into which we will write things
 fq=${new_flavour}.${qualifiers_dots}
-topdir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}
-proddir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}/${UPS_STYLE_VERSION}
-verdir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}/${UPS_STYLE_VERSION}.version
-bindir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}/${UPS_STYLE_VERSION}/${fq}
-incdir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}/${UPS_STYLE_VERSION}/include
-upsdir=${PRODUCTS_INSTALL}/${PACKAGE_NAME}/${UPS_STYLE_VERSION}/ups
+topdir=${upsRoot}/${package_name}
+proddir=${upsRoot}/${package_name}/${UPS_STYLE_VERSION}
+verdir=${upsRoot}/${package_name}/${UPS_STYLE_VERSION}.version
+bindir=${upsRoot}/${package_name}/${UPS_STYLE_VERSION}/${fq}
+incdir=${upsRoot}/${package_name}/${UPS_STYLE_VERSION}/include
+upsdir=${upsRoot}/${package_name}/${UPS_STYLE_VERSION}/ups
 
 # I am not sure what this file is properly called.
 # I am calling it the fqfile, which is short for flavor qualifier file.
@@ -131,7 +118,7 @@ if ! [ -e ${verdir} ];then
 fi
 
 # Remove all content that we will recreate.
-# (Re)create required directories.
+# Create required directories.
 if [ -e ${bindir} ];then
   /bin/rm -rf ${bindir}
 fi
@@ -155,10 +142,10 @@ fi
 
 # Header files:
 rsync -ar --exclude-from  ${KINKAL_TO_UPS_DIR}/exclude_for_include.txt \
-    ${PACKAGE_SOURCE} ${proddir}/include
+    ${package_source} ${proddir}/include
 
 # UPS table file
-${KINKAL_TO_UPS_DIR}/installTableFile ${upsdir}/${PACKAGE_NAME}.table
+${KINKAL_TO_UPS_DIR}/installTableFile ${package_name} ${upsdir}/${package_name}.table ${rootVer} ${rootQuals}
 
 # Libaries and executable binaries
 rsync -ar build_prof/lib ${bindir}
@@ -166,12 +153,12 @@ rsync -ar build_prof/bin ${bindir}
 
 # A copy of the full source
 rsync -ar --exclude-from  ${KINKAL_TO_UPS_DIR}/exclude_for_source.txt \
-  ${PACKAGE_SOURCE} ${proddir}/source
+  ${package_source} ${proddir}/source
 
 # Create the ups fq file.
 cat > ${fqfile} <<EOF
 FILE = version
-PRODUCT = ${PACKAGE_NAME}
+PRODUCT = ${package_name}
 VERSION = ${UPS_STYLE_VERSION}
 
 #*************************************************
@@ -182,9 +169,9 @@ QUALIFIERS = "${qualifiers_colons}"
   DECLARED = `date +"%Y-%m-%d %H:%M:%S GMT" -u`
   MODIFIER = `whoami`
   MODIFIED = `date +"%Y-%m-%d %H:%M:%S GMT" -u`
-  PROD_DIR = ${PACKAGE_NAME}/${UPS_STYLE_VERSION}
+  PROD_DIR = ${package_name}/${UPS_STYLE_VERSION}
   UPS_DIR = ups
-  TABLE_FILE = ${PACKAGE_NAME}.table
+  TABLE_FILE = ${package_name}.table
 
 EOF
 

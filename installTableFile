@@ -4,9 +4,17 @@
 # This create entries for both the prof and debug versions.
 #
 # Arguments:
-#  1 - path to the table file.
+#  1 - Package name
+#  2 - path to the table file.
+#  3 - root version
+#  4 - root qualifier string ( either prof or debug is OK; the code will parse it)
 #
 # This script overwrites previously existing installs of the table file.
+#
+# Fixme:
+# 1) distinguish the root qualifier string from the KinKal qualifier string
+# 2) support additional qualifiers on KinKal
+# 3) There is are repeated qualifier gymnastics here and in build.  Minimize the repetition.
 #
 
 # Define separate qualifier strings for both the prof and debug builds.
@@ -22,14 +30,14 @@ setQualifiers(){
   if [[ "$?" == "0" ]]; then
      profRootQuals=${rootQuals}
      debugRootQuals=`echo ${rootQuals} | sed 's/prof/debug/' | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
-     profColonQuals=${qualifiers_colons}
+     profColonQuals=${rootQuals}
      debugColonQuals=`echo ${profColonQuals} | sed 's/prof/debug/' | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
   else
     echo ${rootQuals} | grep -q debug
     if [[ "$?" == "0" ]]; then
       debugRootQuals=${rootQuals}
       profRootQuals=`echo ${rootQuals} | sed 's/debug/prof/' | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
-      debugColonQuals=${qualifiers_colons}
+      debugColonQuals=${rootQuals}
       profColonQuals=`echo ${debugColonQuals} | sed 's/debug/prof/' | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
     else
       # Expect one of prof or debug
@@ -53,7 +61,10 @@ setQualifiers(){
 #--- main ---
 
 # Arguments
-destination_file=$1
+package_name=$1
+destination_file=$2
+rootVer=$3
+rootQuals=$4
 
 # Define they myriad variants of the qualifiers.
 setQualifiers
@@ -61,13 +72,10 @@ if [[ "$?" != "0" ]]; then
   exit 1
 fi
 
-# Discover the version of root on which KinKal depends
-root_ver=`ups active | awk '$1 == "root" {print $2}'`
-
 # Write the table file in place
 cat > ${destination_file} <<EOF
 File    = table
-Product = ${PACKAGE_NAME}
+Product = ${package_name}
 
 #*************************************************
 # Starting Group definition
@@ -80,7 +88,7 @@ Qualifiers = "${debugColonQuals}"
       envSet( \${UPS_PROD_NAME_UC}_FS, "" )
       execute( "get-directory-name subdir", NO_UPS_ENV, \${UPS_PROD_NAME_UC}_FS )
       envSet (KINKAL_FQ, \${\${UPS_PROD_NAME_UC}_FS}.${debugDotQuals})
-      setupRequired( root  ${root_ver} -q ${plusDebugRootQuals})
+      setupRequired( root  ${rootVer} -q ${plusDebugRootQuals})
 
 Flavor     = ANY
 Qualifiers = "${profColonQuals}"
@@ -89,7 +97,7 @@ Qualifiers = "${profColonQuals}"
       envSet( \${UPS_PROD_NAME_UC}_FS, "" )
       execute( "get-directory-name subdir", NO_UPS_ENV, \${UPS_PROD_NAME_UC}_FS )
       envSet (KINKAL_FQ, \${\${UPS_PROD_NAME_UC}_FS}.${profDotQuals})
-      setupRequired( root  ${root_ver} -q ${plusProfRootQuals})
+      setupRequired( root  ${rootVer} -q ${plusProfRootQuals})
 
 Common:
   Action = setup
