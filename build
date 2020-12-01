@@ -51,20 +51,35 @@ checkConfiguration(){
 # Gymnastics with root qualifiers to predefine several variants that will be needed.
 processROOTQualifiers(){
 
+  # Fixme: allow this to proceed if the two agree.
+  if [[ -n "${rootCmdLineOption}" && -n "${SETUP_ROOT}" ]]; then
+     echo "Error - root is already setup and a root version is also supplied via the command line.  Pick one."
+     return 1
+  fi
+
   # If a root version was not specified by command line argument, then see
   # if there is a root already setup in the environment and use that.
   if [[ -n "${rootCmdLineOption}" ]]; then
      rootQuals=`echo ${rootCmdLineOption} | awk '{print $2}' | sed 's/-q//' | sed 's/+//g'`
-     root_version_local=`echo ${rootCmdLineOption} | awk '{print $1}' `
-  elif [[ -n ${SETUP_ROOT} ]]; then
+     rootVer=`echo ${rootCmdLineOption} | awk '{print $1}' `
+  elif [[ -n "${SETUP_ROOT}" ]]; then
      rootQuals=`echo ${SETUP_ROOT} | awk '{print $NF}'`
-     root_version_local=${ROOT_VERSION}
+     rootVer=${ROOT_VERSION}
      rootCmdLineOption="$ROOT_VERSION -q$rootQuals"
+     echo ${rootQuals} | grep -q prof
+     if [[ "$?" == "0" ]]; then
+       doDebug=""
+     else
+       echo ${rootQuals} | grep -q debug
+       if [[ "$?" == "0" ]]; then
+          doProf=""
+       fi
+     fi
   else
      # If we are only cleaning then we do not need root
      if [[ -n "$doBuild" && -n "$doInstall" ]]; then
        echo "Error - you must either supply the -r option or have an already setup version of ROOT in your shell."
-       return 1
+       return 2
      fi
   fi
 
@@ -86,7 +101,7 @@ processROOTQualifiers(){
       # Expect one of prof or debug; if we are only cleaning then we do not need root
       if [[ -n "$doBuild" && -n "$doInstall" ]]; then
         echo "Error - Expected root to have either a prof or a debug qualifier"
-        return 1
+        return 3
       fi
     fi
   fi
@@ -144,15 +159,16 @@ clean(){
 
 
 install() {
+  echo "Begin install."
 
-  echo "Begin install. "
-
-  if [[ -d build_prof ]]; then
-    ${thisDir}/install ${gitVersion} ${upsRoot} ${root_version_local} ${profRootQuals}
+  if [[ -d build_prof && -n "$doProf" ]]; then
+    echo "Begin install of prof version."
+    ${thisDir}/install ${gitVersion} ${upsRoot} ${rootVer} ${profRootQuals}
   fi
 
-  if [[ -d build_debug ]]; then
-    ${thisDir}/install ${gitVersion} ${upsRoot} ${root_version_local} ${debugRootQuals}
+  if [[ -d build_debug && -n "$doDebug" ]]; then
+    echo "Begin install of debug version."
+    ${thisDir}/install ${gitVersion} ${upsRoot} ${rootVer} ${debugRootQuals}
   fi
 
   return 0
@@ -223,9 +239,10 @@ while getopts abCc:d:ij:nr:tv:Vxh OPT; do
      esac
 done
 
-# Control building one or both build types.
-doprof="true"
-dodebug="true"
+# Control build and install of both prof/debug or just one of them.
+# One of these is disabled if a version of root is found in the environment.
+doProf="true"
+doDebug="true"
 
 processROOTQualifiers
 if [[ "$?" != "0" ]]; then
@@ -233,6 +250,7 @@ if [[ "$?" != "0" ]]; then
 fi
 
 if [[ -n "$verbose" ]]; then
+  echo "Parsed command line arguments: "
   echo "productName:       " ${productName}
   echo "thisDir:           " ${thisDir}
   echo "doClone:           " ${doClone}
@@ -245,6 +263,15 @@ if [[ -n "$verbose" ]]; then
   echo "doTest:            " ${doTest}
   echo "gitVersion:        " ${gitVersion}
   echo "nBuildThreads:     " ${nBuildThreads}
+  echo " "
+  echo "Resolved root information:"
+  echo "Root version:            " ${rootVer}
+  echo "Root qualifiers (prof):  " ${profRootQuals}
+  echo "Root qualifiers (debug): " ${debugRootQuals}
+  echo " "
+  echo "Other:"
+  echo "Prof enabled:            " ${doProf}
+  echo "Debug enabled:           " ${doDebug}
 fi
 
 if ! checkConfiguration ; then
@@ -256,13 +283,17 @@ if [ -n "$doBuild" ]; then
   if ! getCode ; then
     exit 3
   fi
-  ${thisDir}/build_one_version ${cmakever} "${root_version_local} -q${plusProfRootQuals}" ${nBuildThreads} ${doTest}
-  if [[ "$?" != "0" ]]; then
-     exit 4
+  if [[ -n "${doProf}" ]]; then
+    ${thisDir}/build_one_version ${cmakever} "${rootVer} -q${plusProfRootQuals}" ${nBuildThreads} ${doTest}
+    if [[ "$?" != "0" ]]; then
+       exit 4
+    fi
   fi
-  ${thisDir}/build_one_version ${cmakever} "${root_version_local} -q${plusDebugRootQuals}" ${nBuildThreads} ${doTest}
-  if [[ "$?" != "0" ]]; then
-     exit 5
+  if [[ -n "${doDebug}" ]]; then
+    ${thisDir}/build_one_version ${cmakever} "${rootVer} -q${plusDebugRootQuals}" ${nBuildThreads} ${doTest}
+    if [[ "$?" != "0" ]]; then
+       exit 5
+    fi
   fi
 fi
 
