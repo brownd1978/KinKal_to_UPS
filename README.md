@@ -3,19 +3,16 @@ Tools to build the KinKal package and install it in UPS.
 
 # Introduction
 
-* cd clean_working_dir
-* git clone git@github.com:kutschke/KinKal_to_UPS.git
-* setup mu2e
-* KinKal_to_UPS/build -h
-
-There are two ways to use this package:
+There are two basic ways to use this package:
   1) If you already have an exisiting build, you can create a UPS repository and install the existing build there.
   2) Start with nothing, clone, checkout, and, for both build prof and debug, build, test and install.
 
 ## Instructions for case 1
 
-The simplest example for this case is that you have a working directory that contains 2 directories:
+The simplest example for is that you have a working directory that contains 2 directories:
+
   KinKal build_debug
+
 and you already have a debug version of root setup in the environment.  cd to that directory and do
 the following:
 
