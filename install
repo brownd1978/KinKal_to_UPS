@@ -32,7 +32,7 @@ setUPSVersion() {
      echo "Git version is not in a supported style: " ${gitversion}
      return 1
   fi
-  UPS_STYLE_VERSION=`echo $gitversion | sed 's/v//' | awk 'BEGIN{FS="."} { printf ( "v%02d_%02d_%02d\n", $1, $2, $3) }'`"$versionSuffix"
+  ups_style_version=`echo $gitversion | sed 's/v//' | awk 'BEGIN{FS="."} { printf ( "v%02d_%02d_%02d\n", $1, $2, $3) }'`"$versionSuffix"
   return 0
 }
 
@@ -97,11 +97,11 @@ new_flavour=`get-directory-name subdir`
 # Build the names of the directories into which we will write things
 fq=${new_flavour}.${qualifiers_dots}
 topdir=${upsRoot}/${package_name}
-proddir=${upsRoot}/${package_name}/${UPS_STYLE_VERSION}
-verdir=${upsRoot}/${package_name}/${UPS_STYLE_VERSION}.version
-bindir=${upsRoot}/${package_name}/${UPS_STYLE_VERSION}/${fq}
-incdir=${upsRoot}/${package_name}/${UPS_STYLE_VERSION}/include
-upsdir=${upsRoot}/${package_name}/${UPS_STYLE_VERSION}/ups
+proddir=${upsRoot}/${package_name}/${ups_style_version}
+verdir=${upsRoot}/${package_name}/${ups_style_version}.version
+bindir=${upsRoot}/${package_name}/${ups_style_version}/${fq}
+incdir=${upsRoot}/${package_name}/${ups_style_version}/include
+upsdir=${upsRoot}/${package_name}/${ups_style_version}/ups
 
 # I am not sure what this file is properly called.
 # I am calling it the fqfile, which is short for flavor qualifier file.
@@ -162,7 +162,7 @@ rsync -ar --exclude-from  ${KINKAL_TO_UPS_DIR}/exclude_for_source.txt \
 cat > ${fqfile} <<EOF
 FILE = version
 PRODUCT = ${package_name}
-VERSION = ${UPS_STYLE_VERSION}
+VERSION = ${ups_style_version}
 
 #*************************************************
 #
@@ -172,7 +172,7 @@ QUALIFIERS = "${qualifiers_colons}"
   DECLARED = `date +"%Y-%m-%d %H:%M:%S GMT" -u`
   MODIFIER = `whoami`
   MODIFIED = `date +"%Y-%m-%d %H:%M:%S GMT" -u`
-  PROD_DIR = ${package_name}/${UPS_STYLE_VERSION}
+  PROD_DIR = ${package_name}/${ups_style_version}
   UPS_DIR = ups
   TABLE_FILE = ${package_name}.table
 
