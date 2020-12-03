@@ -10,20 +10,20 @@ Script to build, test, install and cleanup the KinKal UPS product.
 
 usage: build <options>
 
-Option Value      Description
-    -b            build code (optional, default = no )
-    -C            clean up working directories ( optional, default=no)
-    -c            VALUE cmake version and qualifiers ( optional, default="v3_18_2", used only for the build step)
-    -d upsRoot    path to the root of the target UPS directory (required if -i selected)
-    -i            install as a UPS product ( optional, default=no)
-    -j value      maximum number of build threads (optional, default =1)
-    -n            do a new clone; if absent expect on to be present (optional, default=no)
-    -r value      root version and qualifiers (optional, if not specfied it will use UPS active)
-    -t            run the tests (optional, default=no, only works if -b is also specified )
-    -v gitVersion name of the git tag (required)
-    -V            make this script verbose (optional, default = no )
-    -x extraQuals additional qualifiers to include in the name of the UPS product ( optional, default = "" )
-    -h            print this help
+Option Value          Description
+    -b                build code (optional, default = no )
+    -C                clean up working directories ( optional, default=no)
+    -c                VALUE cmake version and qualifiers ( optional, default="v3_18_2", used only for the build step)
+    -d upsRoot        path to the root of the target UPS directory (required if -i selected)
+    -i                install as a UPS product ( optional, default=no)
+    -j value          maximum number of build threads (optional, default =1)
+    -n                do a new clone; if absent expect on to be present (optional, default=no)
+    -r value          root version and qualifiers (optional, if not specfied it will use UPS active)
+    -s versionSuffix  Quals additional qualifiers to add as a suffix to the UPS version of the product ( optional, default = "" )
+    -t                run the tests (optional, default=no, only works if -b is also specified )
+    -v gitVersion     name of the git tag (required)
+    -V                make this script verbose (optional, default = no )
+    -h                print this help
 
 For additional details see: https://github.com/kutschke/KinKal_to_UPS
 "
@@ -117,7 +117,7 @@ processROOTQualifiers(){
 getCode() {
   if [[ -n "${doClone}" ]]; then
     echo "Begin clone and checkout for KinKal tag "$gitVersion
-    git clone git@github.com:KFTrack/KinKal.git
+    git clone https://github.com/KFTrack/KinKal.git
     if [[ "$?" != "0" ]]; then
      return 1
     fi
@@ -163,12 +163,12 @@ install() {
 
   if [[ -d build_prof && -n "$doProf" ]]; then
     echo "Begin install of prof version."
-    ${thisDir}/install ${gitVersion} ${upsRoot} ${rootVer} ${profRootQuals}
+    ${thisDir}/install ${gitVersion} ${upsRoot} ${rootVer} ${profRootQuals} ${versionSuffix}
   fi
 
   if [[ -d build_debug && -n "$doDebug" ]]; then
     echo "Begin install of debug version."
-    ${thisDir}/install ${gitVersion} ${upsRoot} ${rootVer} ${debugRootQuals}
+    ${thisDir}/install ${gitVersion} ${upsRoot} ${rootVer} ${debugRootQuals} ${versionSuffix}
   fi
 
   return 0
@@ -193,9 +193,9 @@ nBuildThreads="1"
 upsRoot="${PWD}/artexternals"
 rootCmdLineOption=""
 verbose=""
-extraQuals=""
+versionSuffix=""
 
-while getopts abCc:d:ij:nr:tv:Vxh OPT; do
+while getopts abCc:d:ij:nr:s:tv:Vh OPT; do
     case $OPT in
         b)
             doBuild=true
@@ -216,6 +216,9 @@ while getopts abCc:d:ij:nr:tv:Vxh OPT; do
             ;;
         r)  rootCmdLineOption=$OPTARG
             ;;
+        s)
+            versionSuffix=$OPTARG
+            ;;
         t)  doTest="true"
             ;;
         v)
@@ -223,9 +226,6 @@ while getopts abCc:d:ij:nr:tv:Vxh OPT; do
             ;;
         V)
             verbose="true"
-            ;;
-        x)
-            extraQuals=$OPTARG
             ;;
         h)
             usage
