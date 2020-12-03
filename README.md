@@ -18,7 +18,7 @@ The simplest example is that you have a working directory that contains 2 direct
 and you already have a UPS debug version of root set up in the environment.  In that directory do
 the following:
 
-* git clone git@github.com:kutschke/KinKal_to_UPS.git
+* git clone https://github.com/kutschke/KinKal_to_UPS.git
 * KinKal_to_UPS/build -h  # to see the help
 * KinKal_to_UPS/build -v <git_tag_name> -i
 
@@ -48,7 +48,7 @@ You can access the headers and libraries with the usual -I$KINKAL_INC and -L$KIN
 
 Start in a clean working directory with no UPS version of root or cmake already setup.
 
-* git clone git@github.com:kutschke/KinKal_to_UPS.git
+* git clone https://github.com/kutschke/KinKal_to_UPS.git
 * setup mu2e
 * KinKal_to_UPS/build -v "v0.1.1" -n -b -t -i -c "v3_18_2" -r "v6_20_08a -q+e20:+p383b:+prof" -j 24   -d ${PWD}/artexternals
 
