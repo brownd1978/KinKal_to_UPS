@@ -16,26 +16,6 @@
 # root on which it depends.
 #
 # Fixme: add support for additional qualifiers
-#
-
-#
-# Convert the git tag into UPS version number style
-#    Examples: v0.1.1   to v00_01_01
-#              v0.100.1 to v00_100_01
-# Note: awk printf will expand field width to support numbers larger than 99.
-# Fixme: add more error checking and support other style tags, for example
-#        a suffix after the version number?
-#
-setUPSVersion() {
-  nn=`echo $gitversion | awk 'BEGIN{FS="."} { print NF }'`
-  if [ "${nn}" != "3" ]; then
-     echo "Git version is not in a supported style: " ${gitversion}
-     return 1
-  fi
-  ups_style_version=`echo $gitversion | sed 's/v//' | awk 'BEGIN{FS="."} { printf ( "v%02d_%02d_%02d\n", $1, $2, $3) }'`"$versionSuffix"
-  return 0
-}
-
 
 # Create the UPS qualifiers for the prof and debug versions
 #  - 3 versions, needed for different places in UPSology
@@ -52,7 +32,7 @@ setQualifiers(){
 
 #--- main ---
 
-gitversion=$1
+gitVersion=$1
 upsRoot=$2
 rootVer=$3
 rootQuals=$4
@@ -61,9 +41,15 @@ versionSuffix=$5
 package_name=KinKal
 package_source=${PWD}/${package_name}
 
+# The directory that contains this script.
+thisDir=`dirname $(readlink -f $0)`
+
+# Define some shell functions.
+source ${thisDir}/funcs
+
 setUPSVersion
 if [[ "$?" != 0 ]]; then
-    echo "ERROR - Could not convert the git tag to a UPS version number. The git tag was: " ${gitversion}
+    echo "ERROR - Could not convert the git tag to a UPS version number. The git tag was: " ${gitVersion}
     exit 1
 fi
 
