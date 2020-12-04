@@ -50,10 +50,10 @@ Start in a clean working directory with no UPS version of root or cmake already 
 
 * git clone https://github.com/kutschke/KinKal_to_UPS.git
 * setup mu2e
-* KinKal_to_UPS/build -v "v0.1.1" -n -b -t -i -c "v3_18_2" -r "v6_20_08a -q+e20:+p383b:+prof" -j 24   -d ${PWD}/artexternals
+* KinKal_to_UPS/build -v "v0.1.1" -n -b -t -i -z -c "v3_18_2" -r "v6_20_08a -q+e20:+p383b:+prof" -j 24   -d ${PWD}/artexternals
 
 This will do the following
-* For the requested git tag of KinKal this will clone, checkout, cmake, make, make tests, and install into UPS.
+* For the requested git tag of KinKal this will clone, checkout, cmake, make, make tests, install into UPS, and make tar files for installation on cvmfs.
 * The ups repository into which it is installed is given by the -d option; the default is ${PWD}/artexternals.
 * It will use the indicated versions of cmake and root; there is a default for cmake but only sort-of for root (see below).
 * The make step will do a 24 way parallel build, which is appropriate for mu2ebuild01; the default is a one thread build.
@@ -68,6 +68,12 @@ When this is complete you will see the following subdirectories of clean_working
 * build_prof    - the working space for the Release (prof) build
 * build_debug   - the working space for the Debug (debug) build
 * artexternals  - the UPS repo into which the code is installed.
+
+You will also see two files:
+* KinKal_prof.tar.bz2
+* KinKal_debug.tar.bz2
+
+These tar.bz2 files are formatted to be unwound into /cvmfs/mu2e.opensciencegrid.org/artexternals .
 
 You can point the UPS repo at an arbitrary directory using the -d option but the other four directory names are hard coded.
 
@@ -84,5 +90,6 @@ and artexternals/KinKal.
 * Should I add an option to make tar files for installation on cvmfs?
 * What additional checks for corner cases are needed?
 * I need to roll up the return statuses to one overall exit status and update the exit message.
+* Rename the tar.bz2 files to match the scisoft standard.
 * What else?
 
