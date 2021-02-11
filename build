@@ -221,8 +221,9 @@ gitVersion=""
 nBuildThreads="1"
 upsRoot="${PWD}/artexternals"
 rootCmdLineOption=""
-verbose=""
 versionSuffix=""
+
+export KinKal_Installer_Verbose=""
 
 while getopts abCc:d:ij:nr:s:tv:Vzh OPT; do
     case $OPT in
@@ -254,7 +255,7 @@ while getopts abCc:d:ij:nr:s:tv:Vzh OPT; do
             gitVersion=$OPTARG
             ;;
         V)
-            verbose="true"
+            KinKal_Installer_Verbose="true"
             ;;
         z)
             doTar="true"
@@ -281,7 +282,7 @@ if [[ "$?" != "0" ]]; then
   exit 1
 fi
 
-if [[ -n "$verbose" ]]; then
+if [[ -n "$KinKal_Installer_Verbose" ]]; then
   echo "Parsed command line arguments: "
   echo "productName:       " ${productName}
   echo "thisDir:           " ${thisDir}
