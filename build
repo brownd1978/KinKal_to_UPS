@@ -78,7 +78,7 @@ processROOTQualifiers(){
      fi
   else
      # If we are only cleaning or making tar files then we do not need root
-     if [[ -n "$doBuild" && -n "$doInstall" ]]; then
+     if [[ -n "$doBuild" || -n "$doInstall" ]]; then
        echo "Error - you must either supply the -r option or have an already setup version of ROOT in your shell."
        return 2
      fi
@@ -100,7 +100,7 @@ processROOTQualifiers(){
       profColonQuals=`echo ${debugColonQuals} | sed 's/debug/prof/' | sed 's/:/ /g' | tr " " "\n" | sort | tr "\n" " " | xargs | tr " " ":"`
     else
       # Expect one of prof or debug; if we are only cleaning then we do not need root
-      if [[ -n "$doBuild" && -n "$doInstall" ]]; then
+      if [[ -n "$doBuild" || -n "$doInstall" ]]; then
         echo "Error - Expected root to have either a prof or a debug qualifier"
         return 3
       fi
@@ -162,14 +162,15 @@ clean(){
 install() {
   echo "Begin install."
 
+  # Fixme: second last argument build_prof and build_debug are hard coded.  Should we promote this to variables?
   if [[ -d build_prof && -n "$doProf" ]]; then
     echo "Begin install of prof version."
-    ${thisDir}/install ${gitVersion} ${upsRoot} ${rootVer} ${profRootQuals} ${versionSuffix}
+    ${thisDir}/install ${gitVersion} ${upsRoot} ${rootVer} ${profRootQuals} build_prof ${versionSuffix}
   fi
 
   if [[ -d build_debug && -n "$doDebug" ]]; then
     echo "Begin install of debug version."
-    ${thisDir}/install ${gitVersion} ${upsRoot} ${rootVer} ${debugRootQuals} ${versionSuffix}
+    ${thisDir}/install ${gitVersion} ${upsRoot} ${rootVer} ${debugRootQuals} build_debug ${versionSuffix}
   fi
 
   return 0

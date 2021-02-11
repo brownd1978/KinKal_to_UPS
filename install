@@ -7,7 +7,8 @@
 #  2 - root of the UPS repo into which the product will be installed
 #  3 - The version of root on which this depends
 #  4 - The qualifier string for the root version
-#  5 - Optional.  Suffix to append to the UPS style vesion number.
+#  5 - The path to the directory that contains the libs and bins to be installed.
+#  6 - Optional.  Suffix to append to the UPS style vesion number.
 #
 # This script unconditionally deletes previously existing installs of the
 # same product+version+qualifiers: use with care.
@@ -36,7 +37,8 @@ gitVersion=$1
 upsRoot=$2
 rootVer=$3
 rootQuals=$4
-versionSuffix=$5
+build_path=$5
+versionSuffix=$6
 
 package_name=KinKal
 package_source=${PWD}/${package_name}
@@ -137,8 +139,8 @@ rsync -ar --exclude-from  ${KINKAL_TO_UPS_DIR}/exclude_for_include.txt \
 ${KINKAL_TO_UPS_DIR}/installTableFile ${package_name} ${upsdir}/${package_name}.table ${rootVer} ${rootQuals}
 
 # Libaries and executable binaries
-rsync -ar build_prof/lib ${bindir}
-rsync -ar build_prof/bin ${bindir}
+rsync -ar ${build_path}/lib ${bindir}
+rsync -ar ${build_path}/bin ${bindir}
 
 # A copy of the full source
 rsync -ar --exclude-from  ${KINKAL_TO_UPS_DIR}/exclude_for_source.txt \
