@@ -31,60 +31,6 @@ setQualifiers(){
   return 0
 }
 
-# Copy files from the lib directory in the build area to UPS
-#   - Change leading "lib" to "libKinKal_".
-#   - For symlinks with leading "lib", also reseat the target with the same substitution
-#   - If file does not start with leading "lib" just copy it.
-copyAndRenameLibs(){
-
-    # Ensure that the directory is there.
-    if ! [ -e ${bindir}/lib ];then
-        mkdir ${bindir}/lib
-    fi
-
-    for file in ${build_path}/lib/* ; do
-        libname=`basename $file`
-        prefix=`echo $libname | awk '{print substr($0,0,3)}'`
-
-        # Identify files that need to be renamed.
-        if [[ "$prefix" == "lib" ]]; then
-            barename=`echo $libname | awk '{print substr($0,4)}'`
-            toname=${bindir}"/lib/libKinKal_"${barename}
-            # For symlink, also rename the target
-            if [ -L ${file} ]; then
-                linktarget=`readlink $file`
-                baretarget=`echo ${linktarget} | awk '{print substr($0,4)}'`
-                reseatedTarget="libKinKal_"${baretarget}
-                if [[ -n ${KinKal_Installer_Verbose} ]]; then
-                    echo "  ln -s " ${reseatedTarget} ${toname}
-                fi
-                ln -s  ${reseatedTarget} ${toname}
-            else
-                if [[ -n ${KinKal_Installer_Verbose} ]]; then
-                    echo "  cp " $file " " $toname
-                fi
-                cp ${file} ${toname}
-            fi
-
-        # If a file does not start with "lib" just copy it.
-        else
-            if [[ -n ${KinKal_Installer_Verbose} ]]; then
-                echo "  cp " ${file} ${bindir}/lib/
-            fi
-            cp ${file} ${bindir}/lib/
-        fi
-    done
-
-    unset libname
-    unset prefix
-    unset barename
-    unset toname
-    unset linktarget
-    unset baretarget
-    unset reseatedTarget
-
-}  # end copyAndRenameLibs
-
 #--- main ---
 
 gitVersion=$1
@@ -195,12 +141,12 @@ ${KINKAL_TO_UPS_DIR}/installTableFile ${package_name} ${upsdir}/${package_name}.
 # Libaries and executable binaries
 rsync -ar ${build_path}/bin ${bindir}
 if [[ "$?" != 0 ]]; then
-    echo "ERROR - could not copy bin directory: "
+    echo "ERROR - could not copy the bin directory: "
     exit 3
 fi
-copyAndRenameLibs ${build_path} ${bindir}
+rsync -ar ${build_path}/lib ${bindir}
 if [[ "$?" != 0 ]]; then
-    echo "ERROR - could not copy and rename files in the lib directory: "
+    echo "ERROR - could not copy the lib directory: "
     exit 4
 fi
 
