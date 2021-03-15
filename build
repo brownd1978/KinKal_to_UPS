@@ -150,7 +150,7 @@ getCode() {
 
 clean(){
   echo "Begin clean up. "
-  for dir in KinKal build_prof build_debug; do
+  for dir in KinKal ${buildDirProf} ${buildDirDebug}; do
     if [[ -d ${dir} ]]; then
       echo "Removing " ${dir}
       /bin/rm -rf ${dir}
@@ -162,15 +162,14 @@ clean(){
 install() {
   echo "Begin install."
 
-  # Fixme: second last argument build_prof and build_debug are hard coded.  Should we promote this to variables?
-  if [[ -d build_prof && -n "$doProf" ]]; then
+  if [[ -d ${buildDirProf} && -n "$doProf" ]]; then
     echo "Begin install of prof version."
-    ${thisDir}/install ${gitVersion} ${upsRoot} ${rootVer} ${profRootQuals} build_prof ${versionSuffix}
+    ${thisDir}/install ${gitVersion} ${upsRoot} ${rootVer} ${profRootQuals} ${buildDirProf} ${versionSuffix}
   fi
 
-  if [[ -d build_debug && -n "$doDebug" ]]; then
+  if [[ -d ${buildDirDebug} && -n "$doDebug" ]]; then
     echo "Begin install of debug version."
-    ${thisDir}/install ${gitVersion} ${upsRoot} ${rootVer} ${debugRootQuals} build_debug ${versionSuffix}
+    ${thisDir}/install ${gitVersion} ${upsRoot} ${rootVer} ${debugRootQuals} ${buildDirDebug} ${versionSuffix}
   fi
 
   return 0
@@ -203,6 +202,9 @@ makeTarFiles() {
 # ********** main **********
 
 productName=KinKal
+
+buildDirProf="build_profile"
+buildDirDebug="build_debug"
 
 # The directory that contains this script (and others that it will run).
 thisDir=`dirname $(readlink -f $0)`
