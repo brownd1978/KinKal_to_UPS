@@ -67,21 +67,21 @@ processROOTQualifiers(){
      rootQuals=`echo ${SETUP_ROOT} | awk '{print $NF}'`
      rootVer=${ROOT_VERSION}
      rootCmdLineOption="$ROOT_VERSION -q$rootQuals"
-     echo ${rootQuals} | grep -q prof
-     if [[ "$?" == "0" ]]; then
-       doDebug=""
-     else
-       echo ${rootQuals} | grep -q debug
-       if [[ "$?" == "0" ]]; then
-          doProf=""
-       fi
-     fi
   else
      # If we are only cleaning or making tar files then we do not need root
      if [[ -n "$doBuild" || -n "$doInstall" ]]; then
        echo "Error - you must either supply the -r option or have an already setup version of ROOT in your shell."
        return 2
      fi
+  fi
+  echo ${rootQuals} | grep -q prof
+  if [[ "$?" == "0" ]]; then
+    doDebug=""
+  else
+    echo ${rootQuals} | grep -q debug
+      if [[ "$?" == "0" ]]; then
+	doProf=""
+      fi
   fi
 
   # Define both the debug and prof versions of the qualifer strings.
