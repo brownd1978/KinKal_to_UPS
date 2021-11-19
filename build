@@ -14,14 +14,14 @@ Option Value          Description
     -b                build code (optional, default = no )
     -C                clean up working directories ( optional, default=no)
     -c                VALUE cmake version and qualifiers ( optional, default="v3_18_2", used only for the build step)
-    -d upsRoot        path to the root of the target UPS directory (required if -i selected)
+    -d upsRoot        path to the root of the target UPS directory (required if -i selected) default artexternals
     -i                install as a UPS product ( optional, default=no)
     -j value          maximum number of build threads (optional, default =1)
     -n                do a new clone; if absent expect on to be present (optional, default=no)
     -r value          root version and qualifiers (optional, if not specfied it will use UPS active)
     -s versionSuffix  Quals additional qualifiers to add as a suffix to the UPS version of the product ( optional, default = "" )
     -t                run the tests (optional, default=no, only works if -b is also specified )
-    -v gitVersion     name of the git tag (required)
+    -v gitVersion     name of the git tag (required)  format vNN.NN.NN
     -V                make this script verbose (optional, default = no )
     -z                make the a tar.bz2 file(s) (optional, default = no )
     -h                print this help
@@ -203,8 +203,8 @@ makeTarFiles() {
 
 productName=KinKal
 
-buildDirProf="build_profile"
-buildDirDebug="build_debug"
+buildDirProf="build_KK_prof"
+buildDirDebug="build_KK_debug"
 
 # The directory that contains this script (and others that it will run).
 thisDir=`dirname $(readlink -f $0)`
